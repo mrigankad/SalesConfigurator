@@ -23,16 +23,43 @@ export function ChatWindow({ open, onOpenChange }: Props) {
     isTyping,
     messagesEndRef,
     startConversation,
+    // STEP 0: Company Context
     handleLeadSubmit,
-    handleModelSelect,
+    handleCompanySubmit,
+    handleIndustrySelect,
+    handleRoleSelect,
+    handleWorkedBeforeSelect,
+    handlePreviousProjectsSubmit,
+    handleHowHeardSelect,
+    handleTimelineSelect,
+    // STEP 1: Data Prep
+    handleCadProvisionSelect,
     handleCadFormatSelect,
+    handleModelHierarchySubmit,
+    // STEP 2: Model Definition
+    handleUniqueModelsCount,
+    handleModelNameSubmit,
+    handleUniqueVariantsCount,
     handleSegmentSelect,
+    handleUpdateFrequencySelect,
     handleBodyTypeSelect,
-    handleComplexitySelect,
-    handleDerivativesSelect,
-    handleMaterialSelect,
-    handleDataQualitySelect,
-    handleCapabilitySelect,
+    // STEP 3: Configuration Details
+    handleTrimLevelsCount,
+    handleWheelTypesCount,
+    handleExteriorColorsCount,
+    handleInteriorOptionsCount,
+    handleMarketsSubmit,
+    handleCustomizationLevelSelect,
+    // STEP 4: Modeling Related
+    handleExteriorModelingSelect,
+    handleInteriorSoftPartsSelect,
+    handleReferenceDataSelect,
+    handleCadShapeReferenceSelect,
+    handleScanningNeededSelect,
+    // STEP 5: Material Related
+    handleMaterialSamplesSelect,
+    handleTextureSamplesSelect,
+    // Other
     handleFreeText,
     resetChat,
   } = useChat();
@@ -54,25 +81,89 @@ export function ChatWindow({ open, onOpenChange }: Props) {
 
   const isInputDisabled = currentStep === 'calculating' || currentStep === 'idle';
 
-  // Determine widget size based on current step
+  // Stage 1: phone/thin — greeting + lead capture
+  // Stage 2: medium — questionnaire questions
+  // Stage 3: canvas — results (full viewport)
   const isExpanded = useMemo(() => {
     return [
-      'model_select', 
-      'cad_format_select',
-      'segment_select',
-      'body_type_select',
-      'complexity_select', 
-      'derivatives_select', 
-      'material_complexity_select', 
-      'data_quality_select', 
-      'capability_select', 
-      'calculating', 
-      'results', 
-      'post_results'
+      // STEP 0 (after lead capture)
+      'company_context', 'industry_select', 'role_select',
+      'worked_before', 'previous_projects', 'how_heard', 'project_timeline',
+      // STEP 1
+      'cad_provision', 'cad_format_select', 'model_hierarchy',
+      // STEP 2
+      'unique_models_count', 'model_name', 'unique_variants_count',
+      'segment_select', 'update_frequency', 'body_type_select',
+      // STEP 3
+      'trim_levels', 'wheel_types', 'exterior_colors',
+      'interior_options', 'markets', 'customization_level',
+      // STEP 4
+      'exterior_modeling', 'interior_soft_parts', 'reference_data_provided',
+      'cad_shape_reference', 'scanning_needed',
+      // STEP 5
+      'material_samples', 'texture_samples',
+      // Calculating (before canvas opens)
+      'calculating',
     ].includes(currentStep);
   }, [currentStep]);
 
   const isCanvasMode = currentStep === 'results' || currentStep === 'post_results';
+
+  // Progress indicator steps
+  const progressSteps = [
+    { id: 'lead_capture', label: 'Contact' },
+    { id: 'company_context', label: 'Company' },
+    { id: 'industry_select', label: 'Industry' },
+    { id: 'role_select', label: 'Role' },
+    { id: 'worked_before', label: 'History' },
+    { id: 'project_timeline', label: 'Timeline' },
+    { id: 'cad_provision', label: 'Data Prep' },
+    { id: 'unique_models_count', label: 'Models' },
+    { id: 'segment_select', label: 'Segment' },
+    { id: 'trim_levels', label: 'Config' },
+    { id: 'exterior_modeling', label: 'Modeling' },
+    { id: 'material_samples', label: 'Materials' },
+    { id: 'results', label: 'Results' },
+  ];
+
+  const getCurrentStepIndex = () => {
+    const stepMap: Record<string, number> = {
+      'lead_capture': 0,
+      'company_context': 1,
+      'industry_select': 2,
+      'role_select': 3,
+      'worked_before': 4,
+      'previous_projects': 4,
+      'how_heard': 4,
+      'project_timeline': 5,
+      'cad_provision': 6,
+      'cad_format_select': 6,
+      'model_hierarchy': 6,
+      'unique_models_count': 7,
+      'model_name': 7,
+      'unique_variants_count': 7,
+      'segment_select': 8,
+      'update_frequency': 8,
+      'body_type_select': 8,
+      'trim_levels': 9,
+      'wheel_types': 9,
+      'exterior_colors': 9,
+      'interior_options': 9,
+      'markets': 9,
+      'customization_level': 9,
+      'exterior_modeling': 10,
+      'interior_soft_parts': 10,
+      'reference_data_provided': 10,
+      'cad_shape_reference': 10,
+      'scanning_needed': 10,
+      'material_samples': 11,
+      'texture_samples': 11,
+      'calculating': 12,
+      'results': 12,
+      'post_results': 12,
+    };
+    return stepMap[currentStep] ?? 0;
+  };
 
   return (
     <Dialog.Root open={open} onOpenChange={handleClose}>
@@ -96,8 +187,8 @@ export function ChatWindow({ open, onOpenChange }: Props) {
             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
             className="relative flex flex-col overflow-hidden bg-white/95 rounded-lg border-[6px] border-brand-500/30 backdrop-blur-2xl ring-1 ring-white/60"
             style={{
-              width: isCanvasMode ? 'calc(100vw - 16px)' : isExpanded ? 'min(980px, calc(100vw - 32px))' : 'min(460px, calc(100vw - 32px))',
-              height: isCanvasMode ? 'calc(100vh - 16px)' : isExpanded ? 'min(860px, calc(100vh - 32px))' : 'min(700px, calc(100vh - 32px))',
+              width: isCanvasMode ? 'calc(100vw - 16px)' : isExpanded ? 'min(980px, calc(100vw - 32px))' : 'min(400px, calc(100vw - 32px))',
+              height: isCanvasMode ? 'calc(100vh - 16px)' : isExpanded ? 'min(860px, calc(100vh - 32px))' : 'min(620px, calc(100vh - 32px))',
               boxShadow: `
                 0 40px 80px -20px rgba(0, 85, 137, 0.4), 
                 0 0 100px 10px rgba(0, 85, 137, 0.15),
@@ -126,7 +217,7 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                       animate={{ opacity: 1, x: 0 }}
                       className="text-[10px] font-bold text-brand-500 bg-brand-50 px-2 py-0.5 rounded-full uppercase tracking-wider"
                     >
-                      Configuring
+                      Sales Advisor
                     </motion.span>
                   )}
                 </div>
@@ -137,44 +228,33 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="hidden sm:flex items-center gap-1.5 mr-2"
+                  className="hidden lg:flex flex-col items-end gap-1 mr-2 min-w-[140px]"
                 >
-                  {[
-                    'lead_capture', 
-                    'model_select', 
-                    'cad_format_select',
-                    'segment_select',
-                    'body_type_select',
-                    'complexity_select', 
-                    'derivatives_select', 
-                    'material_complexity_select', 
-                    'data_quality_select', 
-                    'capability_select', 
-                    'results'
-                  ].map((step, i) => (
-                    <div
-                      key={step}
-                      className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                        [
-                          'lead_capture', 
-                          'model_select', 
-                          'cad_format_select',
-                          'segment_select',
-                          'body_type_select',
-                          'complexity_select', 
-                          'derivatives_select', 
-                          'material_complexity_select', 
-                          'data_quality_select', 
-                          'capability_select', 
-                          'calculating', 
-                          'results', 
-                          'post_results'
-                        ].indexOf(currentStep) >= i
-                          ? 'bg-brand-500 scale-100'
-                          : 'bg-slate-200 scale-75'
-                      }`}
-                    />
-                  ))}
+                  {(() => {
+                    const currentIndex = getCurrentStepIndex();
+                    const pct = Math.round((currentIndex / (progressSteps.length - 1)) * 100);
+                    const label = progressSteps[currentIndex]?.label ?? '';
+                    return (
+                      <>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-[10px] font-semibold text-brand-500 uppercase tracking-wider">
+                            {label}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {currentIndex + 1}/{progressSteps.length}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-brand-500 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${pct}%` }}
+                            transition={{ duration: 0.4, ease: 'easeOut' }}
+                          />
+                        </div>
+                      </>
+                    );
+                  })()}
                 </motion.div>
               )}
 
@@ -202,16 +282,42 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                         key={msg.id}
                         msg={msg}
                         userData={userData}
+                        // STEP 0: Company Context
                         onLeadSubmit={handleLeadSubmit}
-                        onModelSelect={handleModelSelect}
+                        onCompanySubmit={handleCompanySubmit}
+                        onIndustrySelect={handleIndustrySelect}
+                        onRoleSelect={handleRoleSelect}
+                        onWorkedBeforeSelect={handleWorkedBeforeSelect}
+                        onPreviousProjectsSubmit={handlePreviousProjectsSubmit}
+                        onHowHeardSelect={handleHowHeardSelect}
+                        onTimelineSelect={handleTimelineSelect}
+                        // STEP 1: Data Prep
+                        onCadProvisionSelect={handleCadProvisionSelect}
                         onCadFormatSelect={handleCadFormatSelect}
+                        onModelHierarchySubmit={handleModelHierarchySubmit}
+                        // STEP 2: Model Definition
+                        onUniqueModelsCount={handleUniqueModelsCount}
+                        onModelNameSubmit={handleModelNameSubmit}
+                        onUniqueVariantsCount={handleUniqueVariantsCount}
                         onSegmentSelect={handleSegmentSelect}
+                        onUpdateFrequencySelect={handleUpdateFrequencySelect}
                         onBodyTypeSelect={handleBodyTypeSelect}
-                        onComplexitySelect={handleComplexitySelect}
-                        onDerivativesSelect={handleDerivativesSelect}
-                        onMaterialSelect={handleMaterialSelect}
-                        onDataQualitySelect={handleDataQualitySelect}
-                        onCapabilitySelect={handleCapabilitySelect}
+                        // STEP 3: Configuration Details
+                        onTrimLevelsCount={handleTrimLevelsCount}
+                        onWheelTypesCount={handleWheelTypesCount}
+                        onExteriorColorsCount={handleExteriorColorsCount}
+                        onInteriorOptionsCount={handleInteriorOptionsCount}
+                        onMarketsSubmit={handleMarketsSubmit}
+                        onCustomizationLevelSelect={handleCustomizationLevelSelect}
+                        // STEP 4: Modeling Related
+                        onExteriorModelingSelect={handleExteriorModelingSelect}
+                        onInteriorSoftPartsSelect={handleInteriorSoftPartsSelect}
+                        onReferenceDataSelect={handleReferenceDataSelect}
+                        onCadShapeReferenceSelect={handleCadShapeReferenceSelect}
+                        onScanningNeededSelect={handleScanningNeededSelect}
+                        // STEP 5: Material Related
+                        onMaterialSamplesSelect={handleMaterialSamplesSelect}
+                        onTextureSamplesSelect={handleTextureSamplesSelect}
                       />
                     ))}
                     {isTyping && (
@@ -252,7 +358,7 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                     transition={{ type: 'spring', damping: 28, stiffness: 320 }}
                     className="bg-slate-50/80 overflow-y-auto flex-1"
                   >
-                    <div className="p-8 h-full min-w-[600px] flex items-center justify-center">
+                    <div className="p-4 w-full">
                       <ResultsCard userData={userData} />
                     </div>
                   </motion.div>
