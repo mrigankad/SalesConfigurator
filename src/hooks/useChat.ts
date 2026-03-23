@@ -471,15 +471,88 @@ export function useChat() {
 
   // --- Free Text & Reset ---
 
-  const handleFreeText = useCallback((text: string) => {
+  const handleFreeText = useCallback(async (text: string) => {
     addUserMessage(text);
-    if (currentStep === 'results' || currentStep === 'post_results') {
-      setCurrentStep('post_results');
-      setTimeout(() => {
-        addAiText("Thanks for your message! A sales representative will follow up. Is there anything else I can help with?");
-      }, 800);
+    setIsTyping(true);
+
+    try {
+      const { askLLM } = await import('../lib/azureAI');
+      const state = useChatStore.getState();
+      const { reply, extracted } = await askLLM(text, state.messages, state.userData, state.currentStep);
+
+      // Show the LLM reply
+      setIsTyping(false);
+      setMessages(prev => [...prev, {
+        id: `ai-${Date.now()}-${Math.random()}`,
+        type: 'ai',
+        content: reply,
+        timestamp: new Date(),
+      }]);
+
+      // If the LLM extracted a valid answer, advance the flow automatically
+      if (extracted !== null && extracted !== 'null' && extracted.trim() !== '') {
+        const step = state.currentStep;
+        setTimeout(() => {
+          switch (step) {
+            case 'company_context':        handleCompanySubmit(extracted); break;
+            case 'industry_select':        handleIndustrySelect(extracted); break;
+            case 'role_select':            handleRoleSelect(extracted); break;
+            case 'worked_before':          handleWorkedBeforeSelect(extracted); break;
+            case 'how_heard':              handleHowHeardSelect(extracted, ''); break;
+            case 'project_timeline':       handleTimelineSelect(extracted); break;
+            case 'cad_provision':          handleCadProvisionSelect(extracted); break;
+            case 'cad_format_select':      handleCadFormatSelect(extracted); break;
+            case 'model_hierarchy':        handleModelHierarchySubmit(extracted.split(',').map(s => s.trim())); break;
+            case 'unique_models_count':    handleUniqueModelsCount(extracted); break;
+            case 'model_name':             handleModelNameSubmit(extracted); break;
+            case 'unique_variants_count':  handleUniqueVariantsCount(extracted); break;
+            case 'segment_select':         handleSegmentSelect(extracted); break;
+            case 'update_frequency':       handleUpdateFrequencySelect(extracted); break;
+            case 'body_type_select':       handleBodyTypeSelect(extracted); break;
+            case 'trim_levels':            handleTrimLevelsCount(extracted); break;
+            case 'wheel_types':            handleWheelTypesCount(extracted); break;
+            case 'exterior_colors':        handleExteriorColorsCount(extracted); break;
+            case 'interior_options':       handleInteriorOptionsCount(extracted); break;
+            case 'markets':                handleMarketsSubmit(extracted.split(',').map(s => s.trim())); break;
+            case 'customization_level':    handleCustomizationLevelSelect(extracted); break;
+            case 'exterior_modeling':      handleExteriorModelingSelect(extracted); break;
+            case 'interior_soft_parts':    handleInteriorSoftPartsSelect(extracted); break;
+            case 'reference_data_provided':handleReferenceDataSelect(extracted); break;
+            case 'cad_shape_reference':    handleCadShapeReferenceSelect(extracted); break;
+            case 'scanning_needed':        handleScanningNeededSelect(extracted); break;
+            case 'material_samples':       handleMaterialSamplesSelect(extracted); break;
+            case 'texture_samples':        handleTextureSamplesSelect(extracted); break;
+          }
+        }, 600);
+      }
+
+      if (state.currentStep === 'results' || state.currentStep === 'post_results') {
+        setCurrentStep('post_results');
+      }
+
+    } catch (err: any) {
+      console.error('LLM error:', err?.message ?? err);
+      setIsTyping(false);
+      setMessages(prev => [...prev, {
+        id: `ai-${Date.now()}-${Math.random()}`,
+        type: 'ai',
+        content: "Sorry, I had trouble processing that. Could you try again?",
+        timestamp: new Date(),
+      }]);
     }
-  }, [addUserMessage, addAiText, currentStep]);
+  }, [
+    addUserMessage, setIsTyping, setMessages, currentStep,
+    handleCompanySubmit, handleIndustrySelect, handleRoleSelect,
+    handleWorkedBeforeSelect, handleHowHeardSelect, handleTimelineSelect,
+    handleCadProvisionSelect, handleCadFormatSelect, handleModelHierarchySubmit,
+    handleUniqueModelsCount, handleModelNameSubmit, handleUniqueVariantsCount,
+    handleSegmentSelect, handleUpdateFrequencySelect, handleBodyTypeSelect,
+    handleTrimLevelsCount, handleWheelTypesCount, handleExteriorColorsCount,
+    handleInteriorOptionsCount, handleMarketsSubmit, handleCustomizationLevelSelect,
+    handleExteriorModelingSelect, handleInteriorSoftPartsSelect, handleReferenceDataSelect,
+    handleCadShapeReferenceSelect, handleScanningNeededSelect,
+    handleMaterialSamplesSelect, handleTextureSamplesSelect,
+  ]);
 
   const resetChat = useCallback(() => {
     resetStore();

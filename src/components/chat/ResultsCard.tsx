@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { CheckCircle2, Phone, Download, Calendar, Clock, Shield, TrendingUp, Zap, Globe, FileText, Building2, ArrowUpRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { CheckCircle2, Phone, Download, Clock, Shield, TrendingUp, Zap, Globe, FileText, Building2, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { UserData } from '../../types';
 import { BookingModal } from './BookingModal';
+import { calculateQuote } from '../../lib/calculateQuote';
 
 interface Props {
   userData: UserData;
@@ -23,53 +24,42 @@ const fadeUp = (delay = 0) => ({
   transition: { delay, duration: 0.4 },
 });
 
-const LINE_ITEMS = [
-  {
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
-        <path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
-      </svg>
-    ),
-    label: 'Model Engineering',
-    description: 'Geometry cleanup, LOD & material assignment',
-    hours: 560,
-    amount: 24500,
-  },
-  {
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>
-      </svg>
-    ),
-    label: 'Virtual Twin Sync',
-    description: 'Pipelines, variant logic & real-time sync',
-    hours: 280,
-    amount: 12350,
-  },
-  {
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
-      </svg>
-    ),
-    label: 'Cloud Compute',
-    description: '3DEXPERIENCE hosting, CI/CD & monitoring',
-    hours: 80,
-    amount: 6000,
-  },
+const LINE_ITEM_ICONS = [
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+    <path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+  </svg>,
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>
+  </svg>,
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+  </svg>,
 ];
-
-const TOTAL = LINE_ITEMS.reduce((s, l) => s + l.amount, 0);
-const TOTAL_HOURS = LINE_ITEMS.reduce((s, l) => s + l.hours, 0);
-
-async function handleExportPdf(userData: UserData) {
-  const { generateQuotePdf } = await import('../../lib/generateQuotePdf');
-  generateQuotePdf(userData);
-}
 
 export function ResultsCard({ userData }: Props) {
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const { lineItems: LINE_ITEMS, total: TOTAL, totalHours: TOTAL_HOURS } = useMemo(
+    () => calculateQuote(userData),
+    [userData],
+  );
+
+  async function handleExportPdf(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const { generateQuotePdf } = await import('../../lib/generateQuotePdf');
+      await generateQuotePdf(userData);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
   const today = new Date();
   const validUntil = new Date(today);
   validUntil.setDate(validUntil.getDate() + 30);
@@ -151,7 +141,7 @@ export function ResultsCard({ userData }: Props) {
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-7 h-7 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-500 shrink-0">
-                  {item.icon}
+                  {LINE_ITEM_ICONS[i]}
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-900 leading-tight">{item.label}</p>
@@ -183,7 +173,6 @@ export function ResultsCard({ userData }: Props) {
           <div className="flex gap-5">
             {[
               { label: 'Effort', value: `${TOTAL_HOURS}h`, icon: <Clock size={11} className="text-emerald-500" /> },
-              { label: 'Lead Time', value: '14 Days', icon: <Calendar size={11} className="text-brand-500" /> },
               { label: 'Valid For', value: '30 Days', icon: <Shield size={11} className="text-amber-500" /> },
             ].map(s => (
               <div key={s.label}>
@@ -200,10 +189,11 @@ export function ResultsCard({ userData }: Props) {
               <CheckCircle2 size={11} />Secure Quote
             </button>
             <button
-              onClick={() => handleExportPdf(userData)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer"
+              onClick={handleExportPdf}
+              disabled={pdfLoading}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
-              <Download size={11} />PDF
+              <Download size={11} />{pdfLoading ? 'Generating…' : 'PDF'}
             </button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Bot, X } from 'lucide-react';
+import { Bot, X, FileText, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
@@ -8,6 +8,8 @@ import { useChat } from '../../hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ResultsCard } from './ResultsCard';
+import { ConfiguratorPanel } from '../configurator/ConfiguratorPanel';
+import { useChatStore } from '../../store/chatStore';
 import { cn } from '../../lib/cn';
 
 interface Props {
@@ -81,6 +83,12 @@ export function ChatWindow({ open, onOpenChange }: Props) {
 
   const isInputDisabled = currentStep === 'calculating' || currentStep === 'idle';
 
+  // True when the last AI message has an interactive card so we can show the hint
+  const hasActiveCard = useMemo(() => {
+    const lastMsg = [...messages].reverse().find(m => m.type === 'ai');
+    return !!lastMsg?.interactiveType && lastMsg.interactiveType !== 'results';
+  }, [messages]);
+
   // Stage 1: phone/thin — greeting + lead capture
   // Stage 2: medium — questionnaire questions
   // Stage 3: canvas — results (full viewport)
@@ -108,6 +116,9 @@ export function ChatWindow({ open, onOpenChange }: Props) {
   }, [currentStep]);
 
   const isCanvasMode = currentStep === 'results' || currentStep === 'post_results';
+
+  const canvasMode = useChatStore(s => s.canvasMode);
+  const setCanvasMode = useChatStore(s => s.setCanvasMode);
 
   // Progress indicator steps
   const progressSteps = [
@@ -204,7 +215,7 @@ export function ChatWindow({ open, onOpenChange }: Props) {
               </div>
               <div className="min-w-0 flex-1">
                 <Dialog.Title className="font-bold text-slate-900 text-base truncate">
-                  Dassault Helper
+                  Dassault Sales Advisor
                 </Dialog.Title>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -223,38 +234,59 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
-              {/* Step indicator */}
+              {/* Step indicator — bar on desktop, dots on mobile */}
               {isExpanded && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="hidden lg:flex flex-col items-end gap-1 mr-2 min-w-[140px]"
+                  className="flex items-center gap-2 mr-2"
                 >
-                  {(() => {
-                    const currentIndex = getCurrentStepIndex();
-                    const pct = Math.round((currentIndex / (progressSteps.length - 1)) * 100);
-                    const label = progressSteps[currentIndex]?.label ?? '';
-                    return (
-                      <>
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[10px] font-semibold text-brand-500 uppercase tracking-wider">
-                            {label}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {currentIndex + 1}/{progressSteps.length}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-brand-500 rounded-full"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${pct}%` }}
-                            transition={{ duration: 0.4, ease: 'easeOut' }}
-                          />
-                        </div>
-                      </>
-                    );
-                  })()}
+                  {/* Desktop: label + bar */}
+                  <div className="hidden sm:flex flex-col items-end gap-1 min-w-[140px]">
+                    {(() => {
+                      const currentIndex = getCurrentStepIndex();
+                      const pct = Math.round((currentIndex / (progressSteps.length - 1)) * 100);
+                      const label = progressSteps[currentIndex]?.label ?? '';
+                      return (
+                        <>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[10px] font-semibold text-brand-500 uppercase tracking-wider">
+                              {label}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {currentIndex + 1}/{progressSteps.length}
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-brand-500 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.4, ease: 'easeOut' }}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  {/* Mobile: compact dots */}
+                  <div className="flex sm:hidden items-center gap-1">
+                    {progressSteps.map((_, idx) => {
+                      const currentIndex = getCurrentStepIndex();
+                      return (
+                        <motion.div
+                          key={idx}
+                          className={`rounded-full transition-all duration-300 ${
+                            idx < currentIndex
+                              ? 'w-1.5 h-1.5 bg-brand-500'
+                              : idx === currentIndex
+                              ? 'w-2.5 h-1.5 bg-brand-500'
+                              : 'w-1.5 h-1.5 bg-slate-200'
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
                 </motion.div>
               )}
 
@@ -344,7 +376,7 @@ export function ChatWindow({ open, onOpenChange }: Props) {
 
                 {/* Input */}
                 <div className="shrink-0 max-w-4xl mx-auto w-full transition-all duration-500">
-                  <ChatInput onSend={handleFreeText} disabled={isInputDisabled} />
+                  <ChatInput onSend={handleFreeText} disabled={isInputDisabled} hasActiveCard={hasActiveCard} />
                 </div>
               </div>
 
@@ -356,10 +388,47 @@ export function ChatWindow({ open, onOpenChange }: Props) {
                     animate={{ flexGrow: 1, width: 'auto', opacity: 1 }}
                     exit={{ flexGrow: 0, width: 0, opacity: 0 }}
                     transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                    className="bg-slate-50/80 overflow-y-auto flex-1"
+                    className="flex flex-col flex-1 overflow-hidden bg-slate-50/80"
                   >
-                    <div className="p-4 w-full">
-                      <ResultsCard userData={userData} />
+                    {/* Toggle tabs */}
+                    <div className="shrink-0 flex border-b border-slate-200 bg-white px-4 pt-3 gap-1">
+                      <button
+                        onClick={() => setCanvasMode('quote')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-xs font-semibold transition-all cursor-pointer ${
+                          canvasMode === 'quote'
+                            ? 'bg-slate-50 text-brand-600 border border-b-0 border-slate-200'
+                            : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        <FileText size={13} />
+                        Quote
+                      </button>
+                      <button
+                        onClick={() => setCanvasMode('configurator')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-t-lg text-xs font-semibold transition-all cursor-pointer ${
+                          canvasMode === 'configurator'
+                            ? 'bg-slate-50 text-brand-600 border border-b-0 border-slate-200'
+                            : 'text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        <Car size={13} />
+                        Configure
+                      </button>
+                    </div>
+
+                    {/* Panel content */}
+                    <div className={cn("flex-1 min-h-0", canvasMode === 'quote' ? "overflow-y-auto p-4" : "overflow-hidden")}>
+                      <AnimatePresence mode="wait">
+                        {canvasMode === 'quote' ? (
+                          <motion.div key="quote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                            <ResultsCard userData={userData} />
+                          </motion.div>
+                        ) : (
+                          <motion.div key="configurator" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                            <ConfiguratorPanel />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </motion.div>
                 )}
